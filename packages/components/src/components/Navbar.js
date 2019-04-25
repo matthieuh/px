@@ -1,4 +1,4 @@
-import React from 'react'
+import React from "react";
 import {
   StyleSheet,
   Text,
@@ -6,12 +6,13 @@ import {
   TextInput,
   TouchableOpacity,
   Image
-} from "react-native"
+} from "react-native";
+import { withNavigation } from "react-navigation";
 
 const styles = StyleSheet.create({
   navbar: {
     flexDirection: "row",
-    alignSelf: 'stretch',
+    alignSelf: "stretch",
     height: 80,
     borderTopColor: "lightgrey",
     borderTopWidth: 1
@@ -26,17 +27,20 @@ const styles = StyleSheet.create({
   }
 });
 
-const Navbar = () => {
+const Navbar = ({ navigation }) => {
   return (
     <View style={styles.navbar}>
-      <TouchableOpacity style={styles.navbarItem}>
+      <TouchableOpacity
+        style={styles.navbarItem}
+        onPress={() => navigation.navigate("Notes")}
+      >
         <Text style={styles.navbarItemText}>My Notes</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={styles.navbarItem}>
+      <TouchableOpacity style={styles.navbarItem} onPress={() => navigation.navigate("Lists")}>
         <Text style={styles.navbarItemText}>My Lists</Text>
       </TouchableOpacity>
     </View>
   );
 };
 
-export default Navbar;
+export default withNavigation(Navbar);
