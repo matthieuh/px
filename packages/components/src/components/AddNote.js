@@ -165,7 +165,7 @@ const AddNote = ({ navigation }) => {
           name: get(data, "title", inputValue),
           item: {
             image: get(data, "image"),
-            description: get(data, "description"),
+            description: get(data, "description")
           }
         }
       });
@@ -178,10 +178,7 @@ const AddNote = ({ navigation }) => {
       {isOpen && (
         <TouchableOpacity
           style={{ alignSelf: "stretch" }}
-          onPress={() => {
-            Keyboard.dismiss();
-            setIsOpen(false);
-          }}
+          onPress={() => setIsOpen(false)}
         >
           <Text
             style={{
@@ -221,8 +218,7 @@ const AddNote = ({ navigation }) => {
               }
 
               if (!value || value === "") {
-                setInputState({ value: "", searched: false });
-                setResults();
+                setIsOpen(false)
               }
             }}
             autoCorrect={false}
@@ -236,7 +232,11 @@ const AddNote = ({ navigation }) => {
                 <AddButton onPress={() => search({ directAdd: true })} />
               )}
               {!inputState.searched && (
-                <Button shape="round" style={{ marginLeft: 10 }} onPress={search}>
+                <Button
+                  shape="round"
+                  style={{ marginLeft: 10 }}
+                  onPress={search}
+                >
                   <Icon
                     name="ios-search"
                     size={22}
