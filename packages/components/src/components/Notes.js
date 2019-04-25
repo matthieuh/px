@@ -38,11 +38,19 @@ const styles = StyleSheet.create({
     height: 100,
     borderBottomColor: "lightgrey",
     borderBottomWidth: 1,
-    padding: 20
+    padding: 14
   },
-  todoName: {
-    fontSize: 22,
-    fontWeight: "bold"
+  itemInfos: {
+    flex: 1
+  },
+  itemName: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 10
+  },
+  itemDescription: {
+    fontSize: 14,
+    color: "lightgrey"
   },
   todoImage: {
     height: 80,
@@ -118,6 +126,8 @@ export default ({ navigation }) => {
     );
   });
 
+  console.log("state", state);
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.todoList}>
@@ -138,18 +148,36 @@ export default ({ navigation }) => {
                   }}
                 />
               )}
-              <Text style={styles.todoName}>{todo.name}</Text>
+              {!todo.item && (
+                <Image
+                  style={styles.todoImage}
+                  resizeMethod="scale"
+                  source={{
+                    uri:
+                      "https://images.unsplash.com/photo-1483546416237-76fd26bbcdd1?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=1650&q=80"
+                  }}
+                />
+              )}
+              <View style={styles.itemInfos}>
+                <Text
+                  style={[
+                    styles.itemName,
+                    todo.item ? {} : { fontWeight: "normal", fontSize: 14 }
+                  ]}
+                  numberOfLines={todo.item ? 1 : 4}
+                >
+                  {todo.name}
+                </Text>
+                {!!(todo.item && todo.item.description) && (
+                  <Text style={styles.itemDescription} numberOfLines={2}>
+                    {todo.item.description}
+                  </Text>
+                )}
+              </View>
             </TouchableOpacity>
           )}
         />
       </View>
-      {/* <KeyboardAvoidingView
-        style={{ alignSelf: "stretch" }}
-        behavior="padding"
-        enabled
-      >
-        <AddNote />
-      </KeyboardAvoidingView> */}
       <AddNote navigation={navigation} />
     </SafeAreaView>
   );

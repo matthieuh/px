@@ -2,7 +2,6 @@ import React from "react";
 import {
   StyleSheet,
   View,
-  TextInput,
   Text,
   Dimensions,
   Keyboard,
@@ -12,6 +11,8 @@ import {
 import { get } from "dot-prop";
 import RoundCheckbox from "rn-round-checkbox";
 import { AutoGrowingTextInput } from "react-native-autogrow-textinput";
+import useDebouncedCallback from "use-debounce/lib/callback";
+import Icon from "react-native-vector-icons/Ionicons";
 
 import useKeyboard from "../hooks/use-keyboard";
 import usePrevious from "../hooks/use-previous";
@@ -19,6 +20,7 @@ import { UserDataContext } from "../contexts/user-data";
 import Scraper from "../services/scraper";
 import theme from "../theme";
 import Button from "./Button";
+import AddButton from "./AddButton";
 
 const styles = StyleSheet.create({
   container: {
@@ -27,8 +29,8 @@ const styles = StyleSheet.create({
   inputContainer: {
     backgroundColor: theme.palette.lightBlue,
     flexDirection: "row",
-    justifyContent: "center",
     alignItems: "center",
+    justifyContent: "space-between",
     paddingVertical: 10,
     paddingHorizontal: 14
   },
@@ -36,8 +38,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 30,
     color: theme.palette.blue,
-    fontSize: 18,
-    alignItems: "center"
+    fontSize: 18
   },
   results: {
     flexGrow: 1,
@@ -49,14 +50,15 @@ const styles = StyleSheet.create({
     height: 100,
     borderBottomColor: "lightgrey",
     borderBottomWidth: 1,
-    padding: 20
+    padding: 14
   },
   webitePreview: {
     flex: 1
   },
   itemName: {
     fontSize: 18,
-    fontWeight: "bold"
+    fontWeight: "bold",
+    marginBottom: 10
   },
   itemLink: {
     fontSize: 14,
@@ -92,11 +94,14 @@ const AddNote = ({ navigation }) => {
     if (!isOpen) {
       setSelectedItem();
       setResults();
+      setInputState({ value: "", searched: false });
+      Keyboard.dismiss();
     }
   }, [isOpen]);
 
-  const search = React.useCallback(
-    async e => {
+  const [debouncedSearch] = useDebouncedCallback(
+    async () => {
+      console.log("search", inputState);
       if (
         !inputState.value.includes("://") &&
         !inputState.value.includes("\n") &&
@@ -109,11 +114,32 @@ const AddNote = ({ navigation }) => {
           setSelectedItem(res[0]);
         }
         setInputState({ value: inputState.value, searched: true });
+      }
+    },
+    1000,
+    [inputState]
+  );
+
+  const search = React.useCallback(
+    async (opts = {}) => {
+      if (
+        !inputState.value.includes("://") &&
+        !inputState.value.includes("\n") &&
+        !inputState.searched &&
+        !opts.directAdd
+      ) {
+        Keyboard.dismiss();
+        const res = await Scraper.getItemsFromName(inputState.value);
+        setResults(res);
+        if (res.length) {
+          setSelectedItem(res[0]);
+        }
+        setInputState({ value: inputState.value, searched: true });
         return;
       }
 
       const id = Date.now();
-      const inputValue = inputState.value
+      const inputValue = inputState.value;
 
       dispatch({
         type: "ADD_TODO",
@@ -124,16 +150,13 @@ const AddNote = ({ navigation }) => {
         }
       });
 
-      setInputState({ value: "", searched: false });
       setIsOpen(false);
-      Keyboard.dismiss();
 
       if (!selectedItem) {
         return;
       }
 
       const data = await Scraper.fetchDataFromUrl(selectedItem.link);
-      console.log("data", data);
 
       await dispatch({
         type: "UPDATE_TODO",
@@ -141,7 +164,8 @@ const AddNote = ({ navigation }) => {
           id,
           name: get(data, "title", inputValue),
           item: {
-            image: get(data, "image")
+            image: get(data, "image"),
+            description: get(data, "description"),
           }
         }
       });
@@ -152,22 +176,31 @@ const AddNote = ({ navigation }) => {
   return (
     <>
       {isOpen && (
-        <View>
-          <TouchableOpacity
-            onPress={() => {
-              Keyboard.dismiss();
-              setIsOpen(false);
+        <TouchableOpacity
+          style={{ alignSelf: "stretch" }}
+          onPress={() => {
+            Keyboard.dismiss();
+            setIsOpen(false);
+          }}
+        >
+          <Text
+            style={{
+              textAlign: "center",
+              color: theme.palette.blue,
+              fontSize: 16,
+              fontWeight: "bold",
+              paddingVertical: 20
             }}
           >
-            <Text>{`< Back`}</Text>
-          </TouchableOpacity>
-        </View>
+            Back
+          </Text>
+        </TouchableOpacity>
       )}
       <View
         style={[
           styles.container,
           isOpen && {
-            height: Dimensions.get("window").height - 40
+            height: Dimensions.get("window").height - 60
           }
         ]}
       >
@@ -182,8 +215,16 @@ const AddNote = ({ navigation }) => {
               const needSearch =
                 !value.includes("://") && !value.includes("\n");
               setInputState({ value, searched: !needSearch });
+
+              if (!needSearch) {
+                setResults();
+              }
+
+              if (!value || value === "") {
+                setInputState({ value: "", searched: false });
+                setResults();
+              }
             }}
-            // onSubmitEditing={search}
             autoCorrect={false}
             minHeight={32}
             maxWidth={300}
@@ -192,8 +233,16 @@ const AddNote = ({ navigation }) => {
           {isOpen && (
             <>
               {!inputState.searched && (
-                <Button style={{ marginLeft: 10 }} onPress={search}>
-                  Search
+                <AddButton onPress={() => search({ directAdd: true })} />
+              )}
+              {!inputState.searched && (
+                <Button shape="round" style={{ marginLeft: 10 }} onPress={search}>
+                  <Icon
+                    name="ios-search"
+                    size={22}
+                    style={{ height: 22, width: 22, textAlign: "center" }}
+                    color="white"
+                  />
                 </Button>
               )}
               {inputState.searched && (
@@ -208,22 +257,48 @@ const AddNote = ({ navigation }) => {
           <FlatList
             style={[styles.results]}
             data={results}
+            ListHeaderComponent={() => {
+              return results && results.length ? (
+                <Text
+                  style={{
+                    textAlign: "center",
+                    fontSize: 16,
+                    fontWeight: "bold",
+                    paddingVertical: 20,
+                    backgroundColor: "#eaeaea"
+                  }}
+                >
+                  Is your note linked to one of this items?
+                </Text>
+              ) : null;
+            }}
             renderItem={({ item, index }) => {
               console.log("item", item);
+              const isSelected =
+                selectedItem && selectedItem.link === item.link;
               return (
                 <TouchableOpacity
                   style={styles.item}
                   key={index}
-                  onPress={() => setSelectedItem(item)}
+                  onPress={() =>
+                    isSelected ? setSelectedItem() : setSelectedItem(item)
+                  }
                 >
                   <View style={styles.webitePreview}>
-                    <Text style={styles.itemName}>{item.title}</Text>
-                    <Text style={styles.itemLink}>{item.link}</Text>
+                    <Text style={styles.itemName} numberOfLines={1}>
+                      {item.title}
+                    </Text>
+                    <Text style={styles.itemLink} numberOfLines={2}>
+                      {item.link}
+                    </Text>
                   </View>
                   <View style={styles.checkboxContainer}>
                     <RoundCheckbox
                       size={24}
-                      checked={selectedItem && selectedItem.link === item.link}
+                      checked={isSelected}
+                      onValueChange={isChecked =>
+                        isChecked ? setSelectedItem(item) : setSelectedItem()
+                      }
                     />
                   </View>
                 </TouchableOpacity>
