@@ -2,7 +2,6 @@ import React from "react";
 import {
   StyleSheet,
   View,
-  TextInput,
   Text,
   Dimensions,
   Keyboard,
@@ -10,15 +9,15 @@ import {
   TouchableOpacity
 } from "react-native";
 import { get } from "dot-prop";
-import RoundCheckbox from "rn-round-checkbox";
 import { AutoGrowingTextInput } from "react-native-autogrow-textinput";
+import useDebouncedCallback from "use-debounce/lib/callback";
 
 import useKeyboard from "../hooks/use-keyboard";
 import usePrevious from "../hooks/use-previous";
 import { UserDataContext } from "../contexts/user-data";
 import Scraper from "../services/scraper";
 import theme from "../theme";
-import Button from "./Button";
+import AddButton from "./AddButton";
 
 const styles = StyleSheet.create({
   container: {
@@ -27,8 +26,8 @@ const styles = StyleSheet.create({
   inputContainer: {
     backgroundColor: theme.palette.lightBlue,
     flexDirection: "row",
-    justifyContent: "center",
     alignItems: "center",
+    justifyContent: "space-between",
     paddingVertical: 10,
     paddingHorizontal: 14
   },
@@ -36,8 +35,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 30,
     color: theme.palette.blue,
-    fontSize: 18,
-    alignItems: "center"
+    fontSize: 18
   },
   results: {
     flexGrow: 1,
@@ -49,7 +47,7 @@ const styles = StyleSheet.create({
     height: 100,
     borderBottomColor: "lightgrey",
     borderBottomWidth: 1,
-    padding: 20
+    padding: 14
   },
   webitePreview: {
     flex: 1
@@ -92,10 +90,33 @@ const AddNote = ({ navigation }) => {
     if (!isOpen) {
       setSelectedItem();
       setResults();
+      setInputState({ value: "", searched: false });
+      Keyboard.dismiss();
     }
   }, [isOpen]);
 
-  const search = React.useCallback(
+  const [debouncedSearch] = useDebouncedCallback(
+    async () => {
+      console.log('search', inputState)
+      if (
+        !inputState.value.includes("://") &&
+        !inputState.value.includes("\n") &&
+        !inputState.searched
+      ) {
+        const res = await Scraper.getItemsFromName(inputState.value);
+        console.log("res", res);
+        setResults(res);
+        if (res.length) {
+          setSelectedItem(res[0]);
+        }
+        setInputState({ value: inputState.value, searched: true });
+      }
+    },
+    1000,
+    [inputState]
+  )
+
+  const add = React.useCallback(
     async e => {
       if (
         !inputState.value.includes("://") &&
@@ -113,7 +134,7 @@ const AddNote = ({ navigation }) => {
       }
 
       const id = Date.now();
-      const inputValue = inputState.value
+      const inputValue = inputState.value;
 
       dispatch({
         type: "ADD_TODO",
@@ -124,9 +145,7 @@ const AddNote = ({ navigation }) => {
         }
       });
 
-      setInputState({ value: "", searched: false });
       setIsOpen(false);
-      Keyboard.dismiss();
 
       if (!selectedItem) {
         return;
@@ -182,6 +201,15 @@ const AddNote = ({ navigation }) => {
               const needSearch =
                 !value.includes("://") && !value.includes("\n");
               setInputState({ value, searched: !needSearch });
+
+              if (needSearch) {
+                debouncedSearch()
+              }
+
+              if (!value || value === "") {
+                setInputState({ value: "", searched: false });
+                setResults();
+              }
             }}
             // onSubmitEditing={search}
             autoCorrect={false}
@@ -189,20 +217,7 @@ const AddNote = ({ navigation }) => {
             maxWidth={300}
             enableScrollToCaret
           />
-          {isOpen && (
-            <>
-              {!inputState.searched && (
-                <Button style={{ marginLeft: 10 }} onPress={search}>
-                  Search
-                </Button>
-              )}
-              {inputState.searched && (
-                <Button style={{ marginLeft: 10 }} onPress={search}>
-                  Add
-                </Button>
-              )}
-            </>
-          )}
+          {isOpen && !!inputState.value && <AddButton style={{ marginLeft: 10 }} />}
         </View>
         {isOpen && (
           <FlatList
@@ -221,9 +236,11 @@ const AddNote = ({ navigation }) => {
                     <Text style={styles.itemLink}>{item.link}</Text>
                   </View>
                   <View style={styles.checkboxContainer}>
-                    <RoundCheckbox
-                      size={24}
-                      checked={selectedItem && selectedItem.link === item.link}
+                    <AddButton
+                      onPress={() => {
+                        setSelectedItem(item);
+                        // debouncedSearch();
+                      }}
                     />
                   </View>
                 </TouchableOpacity>
